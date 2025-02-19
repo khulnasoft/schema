@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 /*
-Package gorilla/schema fills a struct with form values.
+Package khulnasoft/schema fills a struct with form values.
 
 The basic usage is really simple. Given this struct:
 

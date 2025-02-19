@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"mime/multipart"
 	"reflect"
 	"strings"
 	"testing"
@@ -54,6 +55,32 @@ type S1 struct {
 	F19 *rudeBool   `schema:"f19"`
 	F20 []rudeBool  `schema:"f20"`
 	F21 []*rudeBool `schema:"f21"`
+}
+
+type LargeStructForBenchmark struct {
+	F1 string   `schema:"f1"`
+	F2 string   `schema:"f2"`
+	F3 int      `schema:"f3"`
+	F4 int      `schema:"f4"`
+	F5 []string `schema:"f5"`
+	F6 []int    `schema:"f6"`
+	F7 float64  `schema:"f7"`
+	F8 bool     `schema:"f8"`
+	F9 struct {
+		N1 time.Time `schema:"n1"`
+		N2 string    `schema:"n2"`
+	} `schema:"f9"`
+}
+
+// A simple struct for demonstration benchmarks
+type SimpleStructForBenchmark struct {
+	A string  `schema:"a"`
+	B int     `schema:"b"`
+	C bool    `schema:"c"`
+	D float64 `schema:"d"`
+	E struct {
+		F float64 `schema:"f"`
+	} `schema:"e"`
 }
 
 type S2 struct {
@@ -133,34 +160,34 @@ func TestAll(t *testing.T) {
 		},
 		F09: 0,
 		F10: []S1{
-			S1{
+			{
 				F10: []S1{
-					S1{F06: &[]*int{&f101, &f102}},
-					S1{F06: &[]*int{&f103, &f104}},
+					{F06: &[]*int{&f101, &f102}},
+					{F06: &[]*int{&f103, &f104}},
 				},
 			},
 		},
 		F11: []*S1{
-			&S1{
+			{
 				F11: []*S1{
-					&S1{F06: &[]*int{&f111, &f112}},
-					&S1{F06: &[]*int{&f113, &f114}},
+					{F06: &[]*int{&f111, &f112}},
+					{F06: &[]*int{&f113, &f114}},
 				},
 			},
 		},
 		F12: &[]S1{
-			S1{
+			{
 				F12: &[]S1{
-					S1{F06: &[]*int{&f121, &f122}},
-					S1{F06: &[]*int{&f123, &f124}},
+					{F06: &[]*int{&f121, &f122}},
+					{F06: &[]*int{&f123, &f124}},
 				},
 			},
 		},
 		F13: &[]*S1{
-			&S1{
+			{
 				F13: &[]*S1{
-					&S1{F06: &[]*int{&f131, &f132}},
-					&S1{F06: &[]*int{&f133, &f134}},
+					{F06: &[]*int{&f131, &f132}},
+					{F06: &[]*int{&f133, &f134}},
 				},
 			},
 		},
@@ -409,11 +436,11 @@ func BenchmarkAll(b *testing.B) {
 		"f13.0.f13.1.f6": {"133", "134"},
 	}
 
+	decoder := NewDecoder()
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		s := &S1{}
-		_ = NewDecoder().Decode(s, v)
+		_ = decoder.Decode(S1{}, v)
 	}
 }
 
@@ -598,8 +625,10 @@ func TestSimpleExample(t *testing.T) {
 			S05: "S5",
 			Str: "Str",
 		},
-		Bif: []Baz{{
-			F99: []string{"A", "B", "C"}},
+		Bif: []Baz{
+			{
+				F99: []string{"A", "B", "C"},
+			},
 		},
 	}
 
@@ -939,34 +968,34 @@ func TestAllNT(t *testing.T) {
 		},
 		F9: 0,
 		F10: []S1{
-			S1{
+			{
 				F10: []S1{
-					S1{F06: &[]*int{&f101, &f102}},
-					S1{F06: &[]*int{&f103, &f104}},
+					{F06: &[]*int{&f101, &f102}},
+					{F06: &[]*int{&f103, &f104}},
 				},
 			},
 		},
 		F11: []*S1{
-			&S1{
+			{
 				F11: []*S1{
-					&S1{F06: &[]*int{&f111, &f112}},
-					&S1{F06: &[]*int{&f113, &f114}},
+					{F06: &[]*int{&f111, &f112}},
+					{F06: &[]*int{&f113, &f114}},
 				},
 			},
 		},
 		F12: &[]S1{
-			S1{
+			{
 				F12: &[]S1{
-					S1{F06: &[]*int{&f121, &f122}},
-					S1{F06: &[]*int{&f123, &f124}},
+					{F06: &[]*int{&f121, &f122}},
+					{F06: &[]*int{&f123, &f124}},
 				},
 			},
 		},
 		F13: &[]*S1{
-			&S1{
+			{
 				F13: &[]*S1{
-					&S1{F06: &[]*int{&f131, &f132}},
-					&S1{F06: &[]*int{&f133, &f134}},
+					{F06: &[]*int{&f131, &f132}},
+					{F06: &[]*int{&f133, &f134}},
 				},
 			},
 		},
@@ -1287,7 +1316,7 @@ func TestRegisterConverterSlice(t *testing.T) {
 
 	expected := []string{"one", "two", "three"}
 	err := decoder.Decode(&result, map[string][]string{
-		"multiple": []string{"one,two,three"},
+		"multiple": {"one,two,three"},
 	})
 	if err != nil {
 		t.Fatalf("Failed to decode: %v", err)
@@ -1319,7 +1348,7 @@ func TestRegisterConverterMap(t *testing.T) {
 	}{}
 
 	err := decoder.Decode(&result, map[string][]string{
-		"multiple": []string{"a:one,b:two"},
+		"multiple": {"a:one,b:two"},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -1366,9 +1395,9 @@ type S16 struct {
 
 func TestCustomTypeSlice(t *testing.T) {
 	data := map[string][]string{
-		"Value.0": []string{"Louisa May Alcott"},
-		"Value.1": []string{"Florence Nightingale"},
-		"Value.2": []string{"Clara Barton"},
+		"Value.0": {"Louisa May Alcott"},
+		"Value.1": {"Florence Nightingale"},
+		"Value.2": {"Clara Barton"},
 	}
 
 	s := S13{}
@@ -1394,9 +1423,9 @@ func TestCustomTypeSlice(t *testing.T) {
 
 func TestCustomTypeSliceWithError(t *testing.T) {
 	data := map[string][]string{
-		"Value.0": []string{"Louisa May Alcott"},
-		"Value.1": []string{"Florence Nightingale"},
-		"Value.2": []string{"Clara"},
+		"Value.0": {"Louisa May Alcott"},
+		"Value.1": {"Florence Nightingale"},
+		"Value.2": {"Clara"},
 	}
 
 	s := S13{}
@@ -1409,9 +1438,9 @@ func TestCustomTypeSliceWithError(t *testing.T) {
 
 func TestNoTextUnmarshalerTypeSlice(t *testing.T) {
 	data := map[string][]string{
-		"Value.0": []string{"Louisa May Alcott"},
-		"Value.1": []string{"Florence Nightingale"},
-		"Value.2": []string{"Clara Barton"},
+		"Value.0": {"Louisa May Alcott"},
+		"Value.1": {"Florence Nightingale"},
+		"Value.2": {"Clara Barton"},
 	}
 
 	s := S15{}
@@ -1434,7 +1463,7 @@ type S18 struct {
 
 func TestCustomType(t *testing.T) {
 	data := map[string][]string{
-		"Value": []string{"Louisa May Alcott"},
+		"Value": {"Louisa May Alcott"},
 	}
 
 	s := S17{}
@@ -1451,7 +1480,7 @@ func TestCustomType(t *testing.T) {
 
 func TestCustomTypeWithError(t *testing.T) {
 	data := map[string][]string{
-		"Value": []string{"Louisa"},
+		"Value": {"Louisa"},
 	}
 
 	s := S17{}
@@ -1464,7 +1493,7 @@ func TestCustomTypeWithError(t *testing.T) {
 
 func TestNoTextUnmarshalerType(t *testing.T) {
 	data := map[string][]string{
-		"Value": []string{"Louisa May Alcott"},
+		"Value": {"Louisa May Alcott"},
 	}
 
 	s := S18{}
@@ -1477,9 +1506,9 @@ func TestNoTextUnmarshalerType(t *testing.T) {
 
 func TestExpectedType(t *testing.T) {
 	data := map[string][]string{
-		"bools":   []string{"1", "a"},
-		"date":    []string{"invalid"},
-		"Foo.Bar": []string{"a", "b"},
+		"bools":   {"1", "a"},
+		"date":    {"invalid"},
+		"Foo.Bar": {"a", "b"},
 	}
 
 	type B struct {
@@ -1524,11 +1553,11 @@ type R1 struct {
 func TestRequiredField(t *testing.T) {
 	var a R1
 	v := map[string][]string{
-		"a":   []string{"bbb"},
-		"b.c": []string{"88"},
-		"b.d": []string{"9"},
-		"f":   []string{""},
-		"h":   []string{"true"},
+		"a":   {"bbb"},
+		"b.c": {"88"},
+		"b.d": {"9"},
+		"f":   {""},
+		"h":   {"true"},
 	}
 	err := NewDecoder().Decode(&a, v)
 	if err == nil {
@@ -1595,9 +1624,26 @@ type R2 struct {
 
 func TestRequiredStructFiled(t *testing.T) {
 	v := map[string][]string{
-		"a.b": []string{"3"},
+		"a.b": {"3"},
 	}
 	var a R2
+	err := NewDecoder().Decode(&a, v)
+	if err != nil {
+		t.Errorf("error: %v", err)
+	}
+}
+
+type Node struct {
+	Value int   `schema:"val,required"`
+	Next  *Node `schema:"next,required"`
+}
+
+func TestRecursiveStruct(t *testing.T) {
+	v := map[string][]string{
+		"val":      {"1"},
+		"next.val": {"2"},
+	}
+	var a Node
 	err := NewDecoder().Decode(&a, v)
 	if err != nil {
 		t.Errorf("error: %v", err)
@@ -1927,7 +1973,7 @@ func (s *S20) UnmarshalText(text []byte) error {
 // implementations by its elements.
 func TestTextUnmarshalerTypeSlice(t *testing.T) {
 	data := map[string][]string{
-		"Value": []string{"a,b,c"},
+		"Value": {"a,b,c"},
 	}
 	s := struct {
 		Value S20
@@ -1963,7 +2009,7 @@ type S21B []S21E
 // requirements imposed on a slice of structs.
 func TestTextUnmarshalerTypeSliceOfStructs(t *testing.T) {
 	data := map[string][]string{
-		"Value": []string{"raw a"},
+		"Value": {"raw a"},
 	}
 	// Implements encoding.TextUnmarshaler, should not throw invalid path
 	// error.
@@ -2001,7 +2047,7 @@ func (s *S22) UnmarshalText(text []byte) error {
 // especially including simply setting the zero value.
 func TestTextUnmarshalerEmpty(t *testing.T) {
 	data := map[string][]string{
-		"Value": []string{""}, // empty value
+		"Value": {""}, // empty value
 	}
 	// Implements encoding.TextUnmarshaler, should use the type's
 	// UnmarshalText method.
@@ -2032,8 +2078,8 @@ type S23 []*S23e
 
 func TestUnmashalPointerToEmbedded(t *testing.T) {
 	data := map[string][]string{
-		"A.0.F2": []string{"raw a"},
-		"A.0.F3": []string{"raw b"},
+		"A.0.F2": {"raw a"},
+		"A.0.F3": {"raw b"},
 	}
 
 	// Implements encoding.TextUnmarshaler, should not throw invalid path
@@ -2122,7 +2168,6 @@ func TestDoubleEmbedded(t *testing.T) {
 	if !reflect.DeepEqual(expected, s) {
 		t.Errorf("Expected %v errors, got %v", expected, s)
 	}
-
 }
 
 func TestDefaultValuesAreSet(t *testing.T) {
@@ -2280,7 +2325,6 @@ func TestRequiredFieldsCannotHaveDefaults(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), expected) {
 		t.Errorf("decoding should fail with error msg %s got %q", expected, err)
 	}
-
 }
 
 func TestInvalidDefaultElementInSliceRaiseError(t *testing.T) {
@@ -2337,7 +2381,7 @@ func TestInvalidDefaultsValuesHaveNoEffect(t *testing.T) {
 	type D struct {
 		B bool     `schema:"b,default:invalid"`
 		C *float32 `schema:"c,default:notAFloat"`
-		//uint types
+		// uint types
 		D uint   `schema:"d,default:notUint"`
 		E uint8  `schema:"e,default:notUint"`
 		F uint16 `schema:"f,default:notUint"`
@@ -2376,7 +2420,6 @@ func TestInvalidDefaultsValuesHaveNoEffect(t *testing.T) {
 	decoder := NewDecoder()
 
 	err := decoder.Decode(&d, data)
-
 	if err != nil {
 		t.Errorf("decoding should succeed but got error: %q", err)
 	}
@@ -2507,7 +2550,6 @@ func TestDecoder_MaxSize(t *testing.T) {
 }
 
 func TestDecoder_SetMaxSize(t *testing.T) {
-
 	t.Run("default maxsize should be equal to given constant", func(t *testing.T) {
 		t.Parallel()
 		dec := NewDecoder()
@@ -2526,4 +2568,648 @@ func TestDecoder_SetMaxSize(t *testing.T) {
 				configuredMaxSize, limitedMaxSizeDecoder.maxSize)
 		}
 	})
+}
+
+func TestTimeDurationDecoding(t *testing.T) {
+	type DurationStruct struct {
+		Timeout time.Duration `schema:"timeout"`
+	}
+
+	// Prepare the input data
+	input := map[string][]string{
+		"timeout": {"2s"},
+	}
+
+	// Create a decoder with a converter for time.Duration
+	decoder := NewDecoder()
+	decoder.RegisterConverter(time.Duration(0), func(s string) reflect.Value {
+		d, err := time.ParseDuration(s)
+		if err != nil {
+			return reflect.Value{}
+		}
+		return reflect.ValueOf(d)
+	})
+
+	var result DurationStruct
+	err := decoder.Decode(&result, input)
+	if err != nil {
+		t.Fatalf("Failed to decode duration: %v", err)
+	}
+
+	// Expect 2 seconds
+	if result.Timeout != 2*time.Second {
+		t.Errorf("Expected 2s, got %v", result.Timeout)
+	}
+}
+
+func TestTimeDurationDecodingInvalid(t *testing.T) {
+	type DurationStruct struct {
+		Timeout time.Duration `schema:"timeout"`
+	}
+
+	// Prepare the input data
+	input := map[string][]string{
+		"timeout": {"invalid-duration"},
+	}
+
+	// Create a decoder with a converter for time.Duration
+	decoder := NewDecoder()
+	decoder.RegisterConverter(time.Duration(0), func(s string) reflect.Value {
+		// Attempt to parse the duration
+		d, err := time.ParseDuration(s)
+		if err != nil {
+			// Return an invalid reflect.Value to trigger a conversion error
+			return reflect.Value{}
+		}
+		return reflect.ValueOf(d)
+	})
+
+	var result DurationStruct
+	err := decoder.Decode(&result, input)
+	if err == nil {
+		t.Error("Expected an error decoding invalid duration, got nil")
+	}
+}
+
+func TestMultipleConversionErrors(t *testing.T) {
+	type Fields struct {
+		IntField  int           `schema:"int_field"`
+		BoolField bool          `schema:"bool_field"`
+		Duration  time.Duration `schema:"duration_field"`
+	}
+
+	input := map[string][]string{
+		"int_field":      {"invalid-int"},
+		"bool_field":     {"invalid-bool"},
+		"duration_field": {"invalid-duration"},
+	}
+
+	decoder := NewDecoder()
+	decoder.RegisterConverter(time.Duration(0), func(s string) reflect.Value {
+		d, err := time.ParseDuration(s)
+		if err != nil {
+			return reflect.Value{}
+		}
+		return reflect.ValueOf(d)
+	})
+
+	var s Fields
+	err := decoder.Decode(&s, input)
+	if err == nil {
+		t.Fatal("Expected multiple conversion errors, got nil")
+	}
+
+	// Check that all errors are reported (at least 3).
+	mErr, ok := err.(MultiError)
+	if !ok {
+		t.Fatalf("Expected MultiError, got %T", err)
+	}
+	if len(mErr) < 3 {
+		t.Errorf("Expected at least 3 errors, got %d: %v", len(mErr), mErr)
+	}
+}
+
+func TestDecoderMultipartFiles(t *testing.T) {
+	type S struct {
+		A string `schema:"a,required"`
+		B int    `schema:"b,required"`
+		C bool   `schema:"c,required"`
+		D struct {
+			E  float64                  `schema:"e,required"`
+			F  *multipart.FileHeader    `schema:"f,required"`
+			F2 []*multipart.FileHeader  `schema:"f2,required"`
+			F3 *[]*multipart.FileHeader `schema:"f3,required"`
+			F4 *multipart.FileHeader    `schema:"f4,required"`
+		} `schema:"d,required"`
+		G *[]*multipart.FileHeader `schema:"g,required"`
+		J []struct {
+			K *[]*multipart.FileHeader `schema:"k,required"`
+		} `schema:"j,required"`
+	}
+	s := S{}
+	data := map[string][]string{
+		"a":   {"abc"},
+		"b":   {"123"},
+		"c":   {"true"},
+		"d.e": {"3.14"},
+	}
+
+	// Create dummy file headers for testing
+	dummyFile := &multipart.FileHeader{
+		Filename: "test.txt",
+		Size:     4,
+	}
+
+	dummyFile2 := &multipart.FileHeader{
+		Filename: "test2.txt",
+		Size:     4,
+	}
+
+	dummyFile3 := &multipart.FileHeader{
+		Filename: "test3.txt",
+		Size:     4,
+	}
+
+	// Create slice for file headers
+	fileHeaders := map[string][]*multipart.FileHeader{
+		"d.f":   {dummyFile, dummyFile2},
+		"d.f2":  {dummyFile2, dummyFile3},
+		"d.f3":  {dummyFile, dummyFile2, dummyFile3},
+		"d.f4":  {},
+		"g":     {dummyFile, dummyFile2},
+		"j.0.k": {dummyFile, dummyFile2},
+		"j.1.k": {dummyFile2, dummyFile3},
+	}
+
+	decoder := NewDecoder()
+	err := decoder.Decode(&s, data, fileHeaders)
+	if err != nil {
+		t.Fatalf("Failed to decode: %v", err)
+	}
+
+	if s.A != "abc" {
+		t.Errorf("Expected A to be 'abc', got %s", s.A)
+	}
+
+	if s.B != 123 {
+		t.Errorf("Expected B to be 123, got %d", s.B)
+	}
+
+	if s.C != true {
+		t.Errorf("Expected C to be true, got %t", s.C)
+	}
+
+	if s.D.E != 3.14 {
+		t.Errorf("Expected D.E to be 3.14, got %f", s.D.E)
+	}
+
+	if s.D.F == nil {
+		t.Error("Expected D.F to be a file header, got nil")
+	}
+
+	if s.D.F2 == nil {
+		t.Error("Expected D.F2 to be a slice of file headers, got nil")
+	}
+
+	if s.D.F3 == nil {
+		t.Error("Expected D.F3 to be a pointer to a slice of file headers, got nil")
+	}
+
+	if s.D.F4 != nil {
+		fmt.Print(s.D.F4)
+		t.Error("Expected D.F4 to be nil, got a file header")
+	}
+
+	if s.G == nil {
+		t.Error("Expected G to be a pointer to a slice of file headers, got nil")
+	}
+
+	if len(s.D.F2) != 2 {
+		t.Errorf("Expected D.F2 to have 2 file headers, got %d", len(s.D.F2))
+	}
+
+	if len(*s.D.F3) != 3 {
+		t.Errorf("Expected D.F3 to have 3 file headers, got %d", len(*s.D.F3))
+	}
+
+	if len(*s.G) != 2 {
+		t.Errorf("Expected G to have 2 file headers, got %d", len(*s.G))
+	}
+
+	if s.D.F.Filename != "test.txt" {
+		t.Errorf("Expected D.F.Filename to be 'test.txt', got %s", s.D.F.Filename)
+	}
+
+	if s.D.F2[0].Filename != "test2.txt" {
+		t.Errorf("Expected D.F2[0].Filename to be 'test2.txt', got %s", s.D.F2[0].Filename)
+	}
+
+	if s.D.F2[1].Filename != "test3.txt" {
+		t.Errorf("Expected D.F2[1].Filename to be 'test3.txt', got %s", s.D.F2[1].Filename)
+	}
+
+	if (*s.D.F3)[0].Filename != "test.txt" {
+		t.Errorf("Expected D.F3[0].Filename to be 'test.txt', got %s", (*s.D.F3)[0].Filename)
+	}
+
+	if (*s.D.F3)[1].Filename != "test2.txt" {
+		t.Errorf("Expected D.F3[1].Filename to be 'test2.txt', got %s", (*s.D.F3)[1].Filename)
+	}
+
+	if (*s.D.F3)[2].Filename != "test3.txt" {
+		t.Errorf("Expected D.F3[2].Filename to be 'test3.txt', got %s", (*s.D.F3)[2].Filename)
+	}
+
+	if (*s.G)[0].Filename != "test.txt" {
+		t.Errorf("Expected G[0].Filename to be 'test.txt', got %s", (*s.G)[0].Filename)
+	}
+
+	if (*s.G)[1].Filename != "test2.txt" {
+		t.Errorf("Expected G[1].Filename to be 'test2.txt', got %s", (*s.G)[1].Filename)
+	}
+
+	if s.J[0].K == nil {
+		t.Error("Expected J[0].K to be a pointer to a slice of file headers, got nil")
+	}
+
+	if s.J[1].K == nil {
+		t.Error("Expected J[1].K to be a pointer to a slice of file headers, got nil")
+	}
+
+	if len(*s.J[0].K) != 2 {
+		t.Errorf("Expected J[0].K to have 2 file headers, got %d", len(*s.J[0].K))
+	}
+
+	if len(*s.J[1].K) != 2 {
+		t.Errorf("Expected J[1].K to have 2 file headers, got %d", len(*s.J[1].K))
+	}
+
+	if (*s.J[0].K)[0].Filename != "test.txt" {
+		t.Errorf("Expected J[0].K[0].Filename to be 'test.txt', got %s", (*s.J[0].K)[0].Filename)
+	}
+
+	if (*s.J[0].K)[1].Filename != "test2.txt" {
+		t.Errorf("Expected J[0].K[1].Filename to be 'test2.txt', got %s", (*s.J[0].K)[1].Filename)
+	}
+
+	if (*s.J[1].K)[0].Filename != "test2.txt" {
+		t.Errorf("Expected J[1].K[0].Filename to be 'test2.txt', got %s", (*s.J[1].K)[0].Filename)
+	}
+
+	if (*s.J[1].K)[1].Filename != "test3.txt" {
+		t.Errorf("Expected J[1].K[1].Filename to be 'test3.txt', got %s", (*s.J[1].K)[1].Filename)
+	}
+}
+
+func BenchmarkDecoderMultipartFiles(b *testing.B) {
+	type S struct {
+		A string `schema:"a,required"`
+		B int    `schema:"b,required"`
+		C bool   `schema:"c,required"`
+		D struct {
+			E  float64                 `schema:"e,required"`
+			F  *multipart.FileHeader   `schema:"f,required"`
+			F2 []*multipart.FileHeader `schema:"f2,required"`
+		} `schema:"d,required"`
+		G *[]*multipart.FileHeader `schema:"g,required"`
+	}
+	s := S{}
+	data := map[string][]string{
+		"a":   {"abc"},
+		"b":   {"123"},
+		"c":   {"true"},
+		"d.e": {"3.14"},
+	}
+
+	// Create dummy file headers for testing
+	dummyFile := &multipart.FileHeader{
+		Filename: "test.txt",
+		Size:     4,
+	}
+
+	dummyFile2 := &multipart.FileHeader{
+		Filename: "test2.txt",
+		Size:     4,
+	}
+
+	dummyFile3 := &multipart.FileHeader{
+		Filename: "test3.txt",
+		Size:     4,
+	}
+
+	// Create slice for file headers
+	fileHeaders := map[string][]*multipart.FileHeader{
+		"d.f":  {dummyFile, dummyFile2},
+		"d.f2": {dummyFile2, dummyFile3},
+		"g":    {dummyFile, dummyFile2},
+	}
+
+	decoder := NewDecoder()
+	b.ResetTimer()
+
+	var err error
+	for i := 0; i < b.N; i++ {
+		err = decoder.Decode(&s, data, fileHeaders)
+	}
+
+	if err != nil {
+		b.Fatalf("Failed to decode: %v", err)
+	}
+}
+
+func TestIsMultipartFile(t *testing.T) {
+	t.Parallel()
+
+	tc := []struct {
+		typ      reflect.Type
+		input    map[string][]string
+		expected bool
+	}{
+		{
+			typ:      reflect.TypeOf(string("")),
+			expected: false,
+		},
+		{
+			typ:      reflect.TypeOf([]string{}),
+			expected: false,
+		},
+		{
+			typ:      reflect.TypeOf([]*multipart.FileHeader{}),
+			expected: true,
+		},
+		{
+			typ:      reflect.TypeOf(multipart.FileHeader{}),
+			expected: false,
+		},
+		{
+			typ:      reflect.TypeOf(&multipart.FileHeader{}),
+			expected: true,
+		},
+		{
+			typ:      reflect.TypeOf([]multipart.FileHeader{}),
+			expected: false,
+		},
+		{
+			typ:      reflect.TypeOf(&[]*multipart.FileHeader{}),
+			expected: true,
+		},
+	}
+
+	for _, tt := range tc {
+		if isMultipartField(tt.typ) != tt.expected {
+			t.Errorf("Expected %v, got %v", tt.expected, isMultipartField(tt.typ))
+		}
+	}
+}
+
+func BenchmarkIsMultipartFile(b *testing.B) {
+	cases := []struct {
+		typ reflect.Type
+	}{
+		{
+			typ: reflect.TypeOf(string("")),
+		},
+		{
+			typ: reflect.TypeOf([]string{}),
+		},
+		{
+			typ: reflect.TypeOf([]*multipart.FileHeader{}),
+		},
+		{
+			typ: reflect.TypeOf(multipart.FileHeader{}),
+		},
+		{
+			typ: reflect.TypeOf(&multipart.FileHeader{}),
+		},
+		{
+			typ: reflect.TypeOf([]multipart.FileHeader{}),
+		},
+		{
+			typ: reflect.TypeOf(&[]*multipart.FileHeader{}),
+		},
+	}
+
+	for i, bc := range cases {
+		b.Run(fmt.Sprintf("IsMultipartFile-%d", i), func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				isMultipartField(bc.typ)
+			}
+		})
+	}
+}
+
+func TestHandleMultipartField(t *testing.T) {
+	t.Parallel()
+
+	// Create dummy file headers for testing
+	dummyFile := &multipart.FileHeader{
+		Filename: "test.txt",
+		Size:     4,
+	}
+
+	files := map[string][]*multipart.FileHeader{
+		"f": {dummyFile},
+	}
+
+	type S struct {
+		F  *multipart.FileHeader    `schema:"f,required"`
+		F2 []*multipart.FileHeader  `schema:"f2,required"`
+		F3 *[]*multipart.FileHeader `schema:"f3,required"`
+		F4 string                   `schema:"f4,required"`
+	}
+
+	s := S{}
+	rv := reflect.ValueOf(&s).Elem()
+
+	ok := handleMultipartField(rv.FieldByName("F"), files["f"])
+	if !ok {
+		t.Error("Expected handleMultipartField to return true")
+	}
+
+	ok = handleMultipartField(rv.FieldByName("F2"), files["f"])
+	if !ok {
+		t.Error("Expected handleMultipartField to return true")
+	}
+
+	ok = handleMultipartField(rv.FieldByName("F3"), files["f"])
+	if !ok {
+		t.Error("Expected handleMultipartField to return true")
+	}
+
+	ok = handleMultipartField(rv.FieldByName("F4"), files["f"])
+	if ok {
+		t.Error("Expected handleMultipartField to return false")
+	}
+
+	if s.F == nil {
+		t.Error("Expected F to be a file header, got nil")
+	}
+
+	if s.F2 == nil {
+		t.Error("Expected F2 to be a slice of file headers, got nil")
+	}
+
+	if s.F3 == nil {
+		t.Error("Expected F3 to be a pointer to a slice of file headers, got nil")
+	}
+
+	if len(s.F2) != 1 {
+		t.Errorf("Expected F2 to have 1 file header, got %d", len(s.F2))
+	}
+
+	if len(*s.F3) != 1 {
+		t.Errorf("Expected F3 to have 1 file header, got %d", len(*s.F3))
+	}
+
+	if s.F.Filename != "test.txt" {
+		t.Errorf("Expected F.Filename to be 'test.txt', got %s", s.F.Filename)
+	}
+
+	if s.F2[0].Filename != "test.txt" {
+		t.Errorf("Expected F2[0].Filename to be 'test.txt', got %s", s.F2[0].Filename)
+	}
+
+	if (*s.F3)[0].Filename != "test.txt" {
+		t.Errorf("Expected F3[0].Filename to be 'test.txt', got %s", (*s.F3)[0].Filename)
+	}
+}
+
+func BenchmarkHandleMultipartField(b *testing.B) {
+	// Create dummy file headers for testing
+	dummyFile := &multipart.FileHeader{
+		Filename: "test.txt",
+		Size:     4,
+	}
+
+	files := map[string][]*multipart.FileHeader{
+		"f": {dummyFile},
+	}
+
+	type S struct {
+		F  *multipart.FileHeader    `schema:"f,required"`
+		F2 []*multipart.FileHeader  `schema:"f2,required"`
+		F3 *[]*multipart.FileHeader `schema:"f3,required"`
+		F4 string                   `schema:"f4,required"`
+	}
+
+	s := S{}
+	rv := reflect.ValueOf(&s).Elem()
+
+	f := rv.FieldByName("F")
+	f2 := rv.FieldByName("F2")
+	f3 := rv.FieldByName("F3")
+	f4 := rv.FieldByName("F4")
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		handleMultipartField(f, files["f"])
+		handleMultipartField(f2, files["f"])
+		handleMultipartField(f3, files["f"])
+		handleMultipartField(f4, files["f"])
+	}
+}
+
+func BenchmarkLargeStructDecode(b *testing.B) {
+	data := map[string][]string{
+		"f1":    {"Lorem"},
+		"f2":    {"Ipsum"},
+		"f3":    {"123"},
+		"f4":    {"456"},
+		"f5":    {"A", "B", "C", "D"},
+		"f6":    {"10", "20", "30", "40"},
+		"f7":    {"3.14159"},
+		"f8":    {"true"},
+		"f9.n2": {"NestedStringValue"},
+	}
+
+	decoder := NewDecoder()
+	s := &LargeStructForBenchmark{}
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		_ = decoder.Decode(s, data)
+	}
+}
+
+func BenchmarkLargeStructDecodeParallel(b *testing.B) {
+	data := map[string][]string{
+		"f1":    {"Lorem"},
+		"f2":    {"Ipsum"},
+		"f3":    {"123"},
+		"f4":    {"456"},
+		"f5":    {"A", "B", "C", "D"},
+		"f6":    {"10", "20", "30", "40"},
+		"f7":    {"3.14159"},
+		"f8":    {"true"},
+		"f9.n2": {"NestedStringValue"},
+	}
+
+	decoder := NewDecoder()
+	s := &LargeStructForBenchmark{}
+	b.ResetTimer()
+
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			_ = decoder.Decode(s, data)
+		}
+	})
+}
+
+func BenchmarkSimpleStructDecode(b *testing.B) {
+	type S struct {
+		A string  `schema:"a"`
+		B int     `schema:"b"`
+		C bool    `schema:"c"`
+		D float64 `schema:"d"`
+		E struct {
+			F float64 `schema:"f"`
+		} `schema:"e"`
+	}
+	s := S{}
+	data := map[string][]string{
+		"a":   {"abc"},
+		"b":   {"123"},
+		"c":   {"true"},
+		"d":   {"3.14"},
+		"e.f": {"3.14"},
+	}
+	decoder := NewDecoder()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		_ = decoder.Decode(&s, data)
+	}
+}
+
+func BenchmarkCheckRequiredFields(b *testing.B) {
+	type S struct {
+		A string `schema:"a,required"`
+		B int    `schema:"b,required"`
+		C bool   `schema:"c,required"`
+		D struct {
+			E float64 `schema:"e,required"`
+		} `schema:"d,required"`
+	}
+	s := S{}
+	data := map[string][]string{
+		"a":   {"abc"},
+		"b":   {"123"},
+		"c":   {"true"},
+		"d.e": {"3.14"},
+	}
+	decoder := NewDecoder()
+	b.ResetTimer()
+
+	v := reflect.ValueOf(s)
+	// v = v.Elem()
+	t := v.Type()
+
+	for i := 0; i < b.N; i++ {
+		_ = decoder.checkRequired(t, data)
+	}
+}
+
+func BenchmarkTimeDurationDecoding(b *testing.B) {
+	type DurationStruct struct {
+		Timeout time.Duration `schema:"timeout"`
+	}
+
+	// Sample input for decoding
+	input := map[string][]string{
+		"timeout": {"2s"},
+	}
+
+	decoder := NewDecoder()
+	decoder.RegisterConverter(time.Duration(0), func(s string) reflect.Value {
+		d, _ := time.ParseDuration(s)
+		return reflect.ValueOf(d)
+	})
+
+	var ds DurationStruct
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		_ = decoder.Decode(&ds, input)
+	}
 }
